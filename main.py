@@ -18,7 +18,7 @@ GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 @app.post("/ask")
 async def ask_legal(request: Request):
     body = await request.json()
-    user_input = body.get("query")  # ✅ FIXED here
+    user_input = body.get("question")   # ✅ FIXED here
 
     url = "https://api.groq.com/openai/v1/chat/completions"
     headers = {
