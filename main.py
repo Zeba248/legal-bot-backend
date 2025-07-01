@@ -17,7 +17,7 @@ app.add_middleware(
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
-# Temporary PDF memory store
+# ✅ Temporary PDF storage (in-memory dict)
 PDF_DB = {}
 
 BASE_SYSTEM_PROMPT = """
@@ -29,7 +29,7 @@ You are ATOZ Legal Assistant, a highly skilled legal expert in Indian law.
 - Answer based only on official Indian Acts like IPC, CrPC, IBC, Evidence Act, Contract Act, Companies Act, etc.
 - If user chats in Hinglish, reply in Hinglish. If English, reply in English. Never use Hindi script.
 - Continue the conversation smoothly based on previous chats
-- Suggest follow-ups smartly
+- Ask helpful follow-up questions naturally
 - When PDF is uploaded, say: "📄 I got your PDF: *filename* — kya karna chahte ho?"
 - Never mention you're an AI or model. Behave like a real legal assistant.
 """
@@ -51,11 +51,17 @@ async def ask_legal(request: Request):
     for msg in chat_history:
         messages.append({"role": msg["role"], "content": msg["content"]})
 
+    # 📎 Include PDF content if available
     if doc_id and doc_id in PDF_DB:
         pdf_content = PDF_DB[doc_id][:3000]
+
+        # Smart append PDF text for relevant insights
+        if "summarize" in user_input.lower() or "insight" in user_input.lower():
+            user_input += f"\n\nYe uploaded case file hai:\n{pdf_content[:1000]}"
+
         messages.append({
             "role": "system",
-            "content": f"📁 FYI, the user also uploaded a PDF. Summary:\n{pdf_content}"
+            "content": f"📁 FYI, user ne ek PDF diya tha. Summary:\n{pdf_content[:1000]}"
         })
 
     messages.append({"role": "user", "content": user_input})
