@@ -60,7 +60,6 @@ You must always:
 
     response = requests.post(url, headers=headers, json=data)
     result = response.json()
-   return {
-    "response": result["choices"][0]["message"]["content"].strip()
-}
+   return { "response": result["choices"][0]["message"]["content"].strip()}
+
 
