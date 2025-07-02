@@ -24,23 +24,32 @@ temp_dir = tempfile.gettempdir()
 
 @app.post("/upload")
 async def upload_pdf(file: UploadFile = File(...)):
-    file_content = await file.read()
-    filename = file.filename
-    file_path = os.path.join(temp_dir, filename)
-    with open(file_path, "wb") as f:
-        f.write(file_content)
+    try:
+        file_content = await file.read()
+        filename = file.filename
+        file_path = os.path.join(temp_dir, filename)
+        with open(file_path, "wb") as f:
+            f.write(file_content)
 
-    doc = fitz.open(file_path)
-    full_text = "\n\n".join([page.get_text() for page in doc])
-    doc.close()
+        # Extract text
+        doc = fitz.open(file_path)
+        full_text = "\n\n".join([page.get_text() for page in doc])
+        doc.close()
 
-    doc_id = str(uuid.uuid4())
-    pdf_memory[doc_id] = {
-        "filename": filename,
-        "text": full_text
-    }
+        # Store with UUID
+        doc_id = str(uuid.uuid4())
+        pdf_memory[doc_id] = {
+            "filename": filename,
+            "text": full_text
+        }
 
-    return {"doc_id": doc_id, "filename": filename}
+        # ✅ Confirm both filename and doc_id sent
+        return {"doc_id": doc_id, "filename": filename}
+
+    except Exception as e:
+        print("❌ Upload error:", str(e))
+        return {"error": "PDF processing failed. Please upload again."}
+
 
 def get_base_prompt():
     return """
