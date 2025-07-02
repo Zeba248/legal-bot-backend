@@ -48,7 +48,7 @@ async def upload_pdf(file: UploadFile = File(...)):
 
 # 🧠 Prompt
 def get_base_prompt():
-    return '''
+    return """
 You are **ATOZ Legal Assistant**, India’s smartest legal chatbot built for lawyers and clients.
 
 🎯 Your Personality:
