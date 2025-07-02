@@ -66,7 +66,7 @@ async def ask_question(request: Request):
     reply = get_groq_response(history)
     
     if reply.startswith("Groq Error") or reply.startswith("Internal Error"):
-    return JSONResponse({"response": "⚠️ Legal server is currently busy. Please try again in 1 minute."})
+        return JSONResponse({"response": "⚠️ Legal server is currently busy. Please try again in 1 minute."})
 
     
     # Save reply to memory
