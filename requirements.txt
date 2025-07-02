@@ -1,7 +1,12 @@
 fastapi
-fitz
 uvicorn
 requests
 python-multipart
 pdfplumber
+PyMuPDF==1.24.1
+langchain
+chromadb
+tiktoken
+pypdfium2
+
 
