@@ -1,9 +1,12 @@
+# ✅ FINAL main.py (Backend - FastAPI)
+
 from fastapi import FastAPI, Request, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 import requests
-import pdfplumber
-import uuid
 import os
+import uuid
+import tempfile
+import fitz  # PyMuPDF
 
 app = FastAPI()
 
@@ -16,18 +19,48 @@ app.add_middleware(
 )
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-PDF_DB = {}
 
-BASE_SYSTEM_PROMPT = """
+# 🧠 Simple in-memory doc store
+pdf_memory = {}
+
+# 📥 Upload endpoint
+temp_dir = tempfile.gettempdir()
+
+@app.post("/upload")
+async def upload_pdf(file: UploadFile = File(...)):
+    file_content = await file.read()
+    filename = file.filename
+    file_path = os.path.join(temp_dir, filename)
+    with open(file_path, "wb") as f:
+        f.write(file_content)
+
+    doc = fitz.open(file_path)
+    full_text = "\n\n".join([page.get_text() for page in doc])
+    doc.close()
+
+    doc_id = str(uuid.uuid4())
+    pdf_memory[doc_id] = {
+        "filename": filename,
+        "text": full_text
+    }
+
+    return {"doc_id": doc_id, "filename": filename}
+
+# 🧠 Prompt
+def get_base_prompt():
+    return '''
 You are **ATOZ Legal Assistant**, India’s smartest legal chatbot built for lawyers and clients.
 
 🎯 Your Personality:
+- A real human legal assistant, not an AI
+- Professional, smart, and warm — not robotic or overly technical
 - Behave like a **professional legal assistant**, not an AI or chatbot
 - Talk smartly, naturally — like a human expert
-- Reply in **Hinglish** if user talks in Hinglish
+- Reply in **Hinglish** if user talks in Hinglish (Roman Hindi)
 - Reply in **English** if user talks in English
 - ❌ Never use Hindi script
 - ❌ Never introduce yourself or say "as an AI..."
+- ❌ Never reveal that you are AI or mention Groq, GPT, backend, or model
 - Use short, crisp, and smart replies — no robotic tone
 
 📄 PDF Handling:
@@ -35,13 +68,15 @@ You are **ATOZ Legal Assistant**, India’s smartest legal chatbot built for law
   **"📄 I got your PDF: *filename* — kya karna chahte ho?"**  
 - Then wait for user to tell what to do
 - When asked to analyze PDF, read its content (if available) and summarize based on legal info only
-- Never hallucinate about a PDF that was not uploaded
+-  Never hallucinate. If no PDF, don’t pretend it exists.
 - If multiple PDFs are uploaded, clearly mention which file you’re referring to
 - Use actual content from the file — don't make up fake summaries
 
 🧠 Memory + Follow-up:
 - Always remember previous chat messages
+- Continue smartly based on previous chat and uploaded PDF (if available)
 - Follow up smartly, based on what the user said earlier
+- Give follow-up suggestions naturally, like a legal expert
 - Never repeat or restart the intro
 - Behave like you’re continuing the same conversation
 
@@ -51,89 +86,62 @@ You are **ATOZ Legal Assistant**, India’s smartest legal chatbot built for law
 - Don’t make up legal points
 - If info not available in official acts, say:  
   ❝Sorry, no clear provision available as per Indian laws.❞
-- dont give  hallucinated  or fake information always provide 100%accurate and real info 
+- Don’t give hallucinated or fake information — always provide 100% accurate and real info
+- Give follow-up suggestions naturally, like a legal expert.
 👥 User Tone Adaptation:
 - Use friendly Hinglish for casual users
 - Use professional legal English for lawyers
 - If user says "reply in English" or "reply in Hinglish", obey that exactly
-- remeber you are a india's best legal bot of lawyers behave like that provide best info 
+- Remember you are India’s best legal bot for lawyers — behave like that, provide best info
 
 ⚠️ Never Say These:
 - "I'm an AI language model"
 - "As a model"
 - "As an assistant built by..."
 - "I don't have access to..."
-- dont reveal your backend working process how you are built by  or anything never say which model your using keep our info confidential 
+- Don’t reveal your backend working process, how you’re built, or anything confidential
 
-✅ Your goal is to impress the user so much with clarity, smartness, accuracy, and tone — that they feel this is **better than ChatGPT or other chatbots** for law-related use.
-This chatbot should contain best knowledge and it should give a good vibe to the user so the user use it more and buy every time impress the user by giving good impressive answers 
+✅ Your goal is to impress the user so much with clarity, smartness, accuracy, and tone — that they feel this is **better than ChatGPT or any other chatbot** for law-related use.
+This chatbot should contain best knowledge and give a good vibe to the user so they return and subscribe. Always impress.
+
 Never break character. Always behave like ATOZ Legal Assistant.
-
 """
-
+# 🔎 Chat endpoint
 @app.post("/ask")
 async def ask_legal(request: Request):
     body = await request.json()
     user_input = body.get("question", "")
-    chat_history = body.get("history", [])
+    history = body.get("history", [])
     doc_id = body.get("doc_id")
+
+    # ⛔ If doc_id given but not found
+    if doc_id and doc_id not in pdf_memory:
+        return {"response": "⚠️ Sorry, I can't find the uploaded PDF. Please re-upload."}
+
+    # 📄 Include doc content if present
+    pdf_chunk = ""
+    if doc_id:
+        pdf_chunk = f"\n\n📄 Uploaded PDF: {pdf_memory[doc_id]['filename']}\n\n{pdf_memory[doc_id]['text'][:3000]}"
+
+    messages = [
+        {"role": "system", "content": get_base_prompt() + pdf_chunk}
+    ]
+    for m in history:
+        messages.append({"role": m["role"], "content": m["content"]})
+    messages.append({"role": "user", "content": user_input})
 
     headers = {
         "Authorization": f"Bearer {GROQ_API_KEY}",
         "Content-Type": "application/json"
     }
 
-    messages = [{"role": "system", "content": BASE_SYSTEM_PROMPT}]
-    for msg in chat_history:
-        messages.append({"role": msg["role"], "content": msg["content"]})
-
-    # If PDF uploaded and valid
-    if doc_id and doc_id in PDF_DB:
-        pdf_summary = PDF_DB[doc_id][:3000]
-        messages.append({
-            "role": "system",
-            "content": f"📄 FYI, user uploaded a document. Here’s the content:\n{pdf_summary}"
-        })
-
-    messages.append({"role": "user", "content": user_input})
-
     payload = {
         "model": "llama3-70b-8192",
         "messages": messages,
-        "temperature": 0.4,
-        "max_tokens": 1024
+        "temperature": 0.4
     }
 
     response = requests.post("https://api.groq.com/openai/v1/chat/completions", headers=headers, json=payload)
     result = response.json()
-    reply = result["choices"][0]["message"]["content"].strip()
 
-    return {"response": reply}
-
-
-@app.post("/upload")
-async def upload_pdf(file: UploadFile = File(...)):
-    if not file.filename.endswith(".pdf"):
-        return {"error": "Only PDF files supported."}
-
-    pdf_text = ""
-    try:
-        with pdfplumber.open(file.file) as pdf:
-            for page in pdf.pages:
-                page_text = page.extract_text()
-                if page_text:
-                    pdf_text += page_text + "\n"
-    except Exception as e:
-        return {"error": f"PDF could not be processed: {str(e)}"}
-
-    if not pdf_text.strip():
-        return {"error": "PDF appears empty or unreadable. Please upload a proper text-based PDF."}
-
-    doc_id = str(uuid.uuid4())
-    PDF_DB[doc_id] = pdf_text
-
-    return {
-        "message": f"📄 I got your PDF: {file.filename} — kya karna chahte ho?",
-        "doc_id": doc_id,
-        "filename": file.filename
-    }
+    return {"response": result["choices"][0]["message"]["content"].strip()}
