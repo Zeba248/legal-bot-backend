@@ -8,7 +8,6 @@ import fitz  # PyMuPDF
 
 app = FastAPI()
 
-# CORS middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -19,15 +18,15 @@ app.add_middleware(
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
-# 🧠 In-memory PDF storage
+# 🧠 Simple in-memory doc store
 pdf_memory = {}
+temp_dir = tempfile.gettempdir()
 
 @app.post("/upload")
 async def upload_pdf(file: UploadFile = File(...)):
     file_content = await file.read()
     filename = file.filename
-    file_path = os.path.join(tempfile.gettempdir(), filename)
-
+    file_path = os.path.join(temp_dir, filename)
     with open(file_path, "wb") as f:
         f.write(file_content)
 
@@ -64,7 +63,7 @@ You are **ATOZ Legal Assistant**, India’s smartest legal chatbot built for law
   **"📄 I got your PDF: *filename* — kya karna chahte ho?"**  
 - Then wait for user to tell what to do
 - When asked to analyze PDF, read its content (if available) and summarize based on legal info only
--  Never hallucinate. If no PDF, don’t pretend it exists.
+- Never hallucinate. If no PDF, don’t pretend it exists.
 - If multiple PDFs are uploaded, clearly mention which file you’re referring to
 - Use actual content from the file — don't make up fake summaries
 
@@ -83,7 +82,6 @@ You are **ATOZ Legal Assistant**, India’s smartest legal chatbot built for law
 - If info not available in official acts, say:  
   ❝Sorry, no clear provision available as per Indian laws.❞
 - Don’t give hallucinated or fake information — always provide 100% accurate and real info
-- Give follow-up suggestions naturally, like a legal expert.
 
 👥 User Tone Adaptation:
 - Use friendly Hinglish for casual users
@@ -118,9 +116,7 @@ async def ask_legal(request: Request):
     if doc_id:
         pdf_chunk = f"\n\n📄 Uploaded PDF: {pdf_memory[doc_id]['filename']}\n\n{pdf_memory[doc_id]['text'][:3000]}"
 
-    messages = [
-        {"role": "system", "content": get_base_prompt() + pdf_chunk}
-    ]
+    messages = [{"role": "system", "content": get_base_prompt() + pdf_chunk}]
     for m in history:
         messages.append({"role": m["role"], "content": m["content"]})
     messages.append({"role": "user", "content": user_input})
