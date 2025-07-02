@@ -5,10 +5,10 @@ from utils import extract_pdf_text, get_groq_response
 
 app = FastAPI()
 
-# CORS for frontend
+# CORS settings
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # restrict this in prod
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -26,7 +26,7 @@ async def upload_pdf(file: UploadFile = File(...)):
     pdf_store["filename"] = file.filename
     pdf_store["text"] = text
 
-    # Setup memory with strict role instructions
+    # Set up memory
     chat_memory["history"] = [
         {
             "role": "system",
@@ -74,13 +74,6 @@ async def ask_question(request: Request):
 
     except Exception as e:
         return JSONResponse({"response": f"⚠️ Server error: {str(e)}"})
-
-    
-    # Save reply to memory
-    history.append({"role": "assistant", "content": reply})
-    chat_memory["history"] = history
-
-    return JSONResponse({"response": reply})
 
 @app.get("/")
 def root():
