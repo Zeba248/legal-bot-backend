@@ -1,5 +1,3 @@
-# ✅ FINAL main.py (Backend - FastAPI)
-
 from fastapi import FastAPI, Request, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 import requests
@@ -10,6 +8,7 @@ import fitz  # PyMuPDF
 
 app = FastAPI()
 
+# CORS middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -20,17 +19,15 @@ app.add_middleware(
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
-# 🧠 Simple in-memory doc store
+# 🧠 In-memory PDF storage
 pdf_memory = {}
-
-# 📥 Upload endpoint
-temp_dir = tempfile.gettempdir()
 
 @app.post("/upload")
 async def upload_pdf(file: UploadFile = File(...)):
     file_content = await file.read()
     filename = file.filename
-    file_path = os.path.join(temp_dir, filename)
+    file_path = os.path.join(tempfile.gettempdir(), filename)
+
     with open(file_path, "wb") as f:
         f.write(file_content)
 
@@ -46,7 +43,6 @@ async def upload_pdf(file: UploadFile = File(...)):
 
     return {"doc_id": doc_id, "filename": filename}
 
-# 🧠 Prompt
 def get_base_prompt():
     return """
 You are **ATOZ Legal Assistant**, India’s smartest legal chatbot built for lawyers and clients.
@@ -88,6 +84,7 @@ You are **ATOZ Legal Assistant**, India’s smartest legal chatbot built for law
   ❝Sorry, no clear provision available as per Indian laws.❞
 - Don’t give hallucinated or fake information — always provide 100% accurate and real info
 - Give follow-up suggestions naturally, like a legal expert.
+
 👥 User Tone Adaptation:
 - Use friendly Hinglish for casual users
 - Use professional legal English for lawyers
@@ -106,7 +103,7 @@ This chatbot should contain best knowledge and give a good vibe to the user so t
 
 Never break character. Always behave like ATOZ Legal Assistant.
 """
-# 🔎 Chat endpoint
+
 @app.post("/ask")
 async def ask_legal(request: Request):
     body = await request.json()
@@ -114,11 +111,9 @@ async def ask_legal(request: Request):
     history = body.get("history", [])
     doc_id = body.get("doc_id")
 
-    # ⛔ If doc_id given but not found
     if doc_id and doc_id not in pdf_memory:
         return {"response": "⚠️ Sorry, I can't find the uploaded PDF. Please re-upload."}
 
-    # 📄 Include doc content if present
     pdf_chunk = ""
     if doc_id:
         pdf_chunk = f"\n\n📄 Uploaded PDF: {pdf_memory[doc_id]['filename']}\n\n{pdf_memory[doc_id]['text'][:3000]}"
