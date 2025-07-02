@@ -50,23 +50,30 @@ async def upload_pdf(file: UploadFile = File(...)):
 
 @app.post("/ask")
 async def ask_question(request: Request):
-    data = await request.json()
-    question = data.get("question", "")
-    history = chat_memory.get("history", [])
-    pdf_text = pdf_store.get("text")
+    try:
+        data = await request.json()
+        question = data.get("question", "")
 
-    # Add PDF content if available
-    if pdf_text:
-        question += f"\n\n(Use this PDF content if needed):\n{pdf_text[:3000]}"
+        history = chat_memory.get("history", [])
+        pdf_text = pdf_store.get("text")
 
-    # Add question to memory
-    history.append({"role": "user", "content": question})
+        if pdf_text:
+            question = f"{question}\n\nPDF Content (if needed):\n{pdf_text[:3000]}"
 
-    # Get response
-    reply = get_groq_response(history)
-    
-    if reply.startswith("Groq Error") or reply.startswith("Internal Error"):
-        return JSONResponse({"response": "⚠️ Legal server is currently busy. Please try again in 1 minute."})
+        history.append({"role": "user", "content": question})
+
+        reply = get_groq_response(history)
+
+        if "Groq Error" in reply or "Internal Error" in reply:
+            return JSONResponse({"response": "⚠️ Legal server is currently busy. Please try again in 1 minute."})
+
+        history.append({"role": "assistant", "content": reply})
+        chat_memory["history"] = history
+
+        return JSONResponse({"response": reply})
+
+    except Exception as e:
+        return JSONResponse({"response": f"⚠️ Server error: {str(e)}"})
 
     
     # Save reply to memory
