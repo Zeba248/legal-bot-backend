@@ -1,6 +1,6 @@
 import os
 import fitz  # PyMuPDF
-from groq import Groq
+from groq.client import Groq 
 
 client = Groq(api_key=os.getenv("GROQ_API_KEY"))  # Secure load
 
