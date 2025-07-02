@@ -24,7 +24,7 @@ def get_groq_response(history):
         }
 
         data = {
-            "model": "mixtral-8x7b-32768",
+            "model": "mixtral-8x7b-32768",  # ya whatever you're using
             "messages": history,
             "temperature": 0.4
         }
@@ -38,7 +38,9 @@ def get_groq_response(history):
         if response.status_code == 200:
             return response.json()["choices"][0]["message"]["content"]
         else:
+            print("🔴 GROQ ERROR:", response.status_code, response.text)
             return f"Groq Error: {response.status_code} — {response.text}"
 
     except Exception as e:
+        print("❌ INTERNAL ERROR:", str(e))
         return f"Internal Error: {str(e)}"
