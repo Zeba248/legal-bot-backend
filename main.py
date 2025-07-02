@@ -2,86 +2,75 @@ from fastapi import FastAPI, UploadFile, File, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from utils import extract_pdf_text, get_groq_response
-import hashlib
 
 app = FastAPI()
 
-# Allow frontend to connect (CORS)
+# CORS setup for frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Production me specific origin lagao
+    allow_origins=["*"],  # 👈 restrict in production
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Store all users' data
-user_sessions = {}  # session_id -> {"pdf": "...", "history": [...]}
+# Global memory (improved)
+chat_memory = {}
+pdf_store = {}
 
-# Generate unique session_id using client IP
-def get_session_id(request: Request):
-    client_ip = request.client.host
-    return hashlib.sha256(client_ip.encode()).hexdigest()
-
-# PDF Upload Endpoint
 @app.post("/upload")
-async def upload_pdf(request: Request, file: UploadFile = File(...)):
-    session_id = get_session_id(request)
+async def upload_pdf(file: UploadFile = File(...)):
     contents = await file.read()
     text = extract_pdf_text(contents)
 
-    user_sessions[session_id] = {
-        "pdf": text,
-        "history": [
-            {
-                "role": "system",
-                "content": (
-                    "You are ATOZ Legal Chatbot, a smart Indian legal assistant that deeply understands the uploaded legal PDF."
-                    " Speak clearly in Hinglish or English depending on user tone. NEVER say you're a text-based AI."
-                    " If the user has uploaded a PDF (like FIR, legal notice etc.), use that fully for context. Be realistic, smart, and behave like a real assistant."
-                )
-            },
-            {
-                "role": "user",
-                "content": f"Maine ek PDF upload kiya hai: {file.filename}. Jab tak mai na kahu, uska analysis mat karo."
-            },
-            {
-                "role": "assistant",
-                "content": f"Theek hai, maine {file.filename} receive kar liya. Bataye ab kya karna hai?"
-            }
-        ]
-    }
+    # Save PDF data
+    pdf_store["filename"] = file.filename
+    pdf_store["text"] = text
 
-    return {"message": f"I got your PDF: {file.filename}. Kya karna chahte ho?"}
+    # Setup initial memory
+    chat_memory["history"] = [
+        {
+            "role": "system",
+            "content": (
+                "You are ATOZ Legal Chatbot, a smart Indian legal assistant."
+                " Speak clearly in Hinglish or English based on user tone. NEVER say you're an AI."
+                " Always behave realistically. If PDF uploaded (like FIR, notice), use it smartly if asked."
+            )
+        },
+        {
+            "role": "user",
+            "content": f"Maine ek PDF upload kiya hai: {file.filename}. Jab tak mai na kahu, uska analysis mat karo."
+        },
+        {
+            "role": "assistant",
+            "content": f"Theek hai, maine {file.filename} receive kar liya. Ab batao kya karna hai?"
+        }
+    ]
 
-# Question Asking Endpoint
+    return {"message": f"✅ I got your PDF: {file.filename}. Kya karna chahte ho?"}
+
 @app.post("/ask")
 async def ask_question(request: Request):
-    session_id = get_session_id(request)
-    data = await request.json()
-    question = data.get("question", "")
+    try:
+        data = await request.json()
+        question = data.get("question", "")
+        history = chat_memory.get("history", [])
+        pdf_text = pdf_store.get("text", "")
 
-    # Load user's session
-    session = user_sessions.get(session_id)
-    if not session:
-        return JSONResponse({"response": "⚠️ Please upload a PDF before asking a question."})
+        # Include PDF content if exists
+        if pdf_text:
+            question += f"\n\n(PDF se jarurat ho to use yeh content):\n{pdf_text[:3000]}"
 
-    history = session.get("history", [])
-    pdf_text = session.get("pdf", "")
+        history.append({"role": "user", "content": question})
+        reply = get_groq_response(history)
+        history.append({"role": "assistant", "content": reply})
+        chat_memory["history"] = history
 
-    if pdf_text:
-        question += f"\n\n(Use this PDF content if needed):\n{pdf_text[:3000]}"
+        return JSONResponse({"response": reply})
 
-    history.append({"role": "user", "content": question})
+    except Exception as e:
+        return JSONResponse({"response": f"⚠️ Internal Error: {str(e)}"})
 
-    reply = get_groq_response(history)
-
-    history.append({"role": "assistant", "content": reply})
-    user_sessions[session_id]["history"] = history
-
-    return JSONResponse({"response": reply})
-
-# Health check
 @app.get("/")
 def root():
-    return {"message": "ATOZ Legal Chatbot is running."}
+    return {"message": "✅ ATOZ Legal Chatbot backend is running!"}
