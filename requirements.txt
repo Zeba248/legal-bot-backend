@@ -1,4 +1,5 @@
 fastapi
+fitz
 uvicorn
 requests
 python-multipart
