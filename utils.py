@@ -1,7 +1,6 @@
 import os
 import fitz  # PyMuPDF
-from groq.client import Groq 
-
+from groq import Groq 
 client = Groq(api_key=os.getenv("GROQ_API_KEY"))  # Secure load
 
 def extract_pdf_text(contents: bytes) -> str:
