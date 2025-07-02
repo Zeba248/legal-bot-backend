@@ -5,10 +5,10 @@ from utils import extract_pdf_text, get_groq_response
 
 app = FastAPI()
 
-# CORS settings
+# CORS for frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"],  # restrict this in prod
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -26,7 +26,7 @@ async def upload_pdf(file: UploadFile = File(...)):
     pdf_store["filename"] = file.filename
     pdf_store["text"] = text
 
-    # Set up memory
+    # Setup memory with strict role instructions
     chat_memory["history"] = [
         {
             "role": "system",
@@ -50,30 +50,26 @@ async def upload_pdf(file: UploadFile = File(...)):
 
 @app.post("/ask")
 async def ask_question(request: Request):
-    try:
-        data = await request.json()
-        question = data.get("question", "")
+    data = await request.json()
+    question = data.get("question", "")
+    history = chat_memory.get("history", [])
+    pdf_text = pdf_store.get("text")
 
-        history = chat_memory.get("history", [])
-        pdf_text = pdf_store.get("text")
+    # Add PDF content if available
+    if pdf_text:
+        question += f"\n\n(Use this PDF content if needed):\n{pdf_text[:3000]}"
 
-        if pdf_text:
-            question = f"{question}\n\nPDF Content (if needed):\n{pdf_text[:3000]}"
+    # Add question to memory
+    history.append({"role": "user", "content": question})
 
-        history.append({"role": "user", "content": question})
+    # Get response
+    reply = get_groq_response(history)
 
-        reply = get_groq_response(history)
+    # Save reply to memory
+    history.append({"role": "assistant", "content": reply})
+    chat_memory["history"] = history
 
-        if "Groq Error" in reply or "Internal Error" in reply:
-            return JSONResponse({"response": "⚠️ Legal server is currently busy. Please try again in 1 minute."})
-
-        history.append({"role": "assistant", "content": reply})
-        chat_memory["history"] = history
-
-        return JSONResponse({"response": reply})
-
-    except Exception as e:
-        return JSONResponse({"response": f"⚠️ Server error: {str(e)}"})
+    return JSONResponse({"response": reply})
 
 @app.get("/")
 def root():
