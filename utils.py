@@ -1,5 +1,17 @@
 import os
 import requests
+import pdfplumber
+import io
+
+def extract_pdf_text(file_bytes):
+    try:
+        text = ""
+        with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
+            for page in pdf.pages:
+                text += page.extract_text() or ""
+        return text
+    except Exception as e:
+        return f"PDF Extraction Error: {str(e)}"
 
 def get_groq_response(history):
     try:
@@ -13,7 +25,7 @@ def get_groq_response(history):
         }
 
         data = {
-            "model": "mixtral-8x7b-32768",  # ya whatever you're using
+            "model": "mixtral-8x7b-32768",
             "messages": history,
             "temperature": 0.4
         }
