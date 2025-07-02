@@ -64,7 +64,11 @@ async def ask_question(request: Request):
 
     # Get response
     reply = get_groq_response(history)
+    
+    if reply.startswith("Groq Error") or reply.startswith("Internal Error"):
+    return JSONResponse({"response": "⚠️ Legal server is currently busy. Please try again in 1 minute."})
 
+    
     # Save reply to memory
     history.append({"role": "assistant", "content": reply})
     chat_memory["history"] = history
