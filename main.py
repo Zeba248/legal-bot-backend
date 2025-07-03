@@ -48,25 +48,28 @@ async def upload_pdf(file: UploadFile = File(...)):
         }
     ]
 
-    return {"message": f"✅ I got your PDF: {file.filename}. Kya karna chahte ho?", "doc_id": file.filename}
+    return {"message": f"✅ I got your PDF: {file.filename}. Kya karna chahte ho?", "doc_id": "active"}
 
 @app.post("/ask")
 async def ask_question(request: Request):
     try:
         data = await request.json()
-        question = data.get("question", "").strip()
+        question = data.get("question", "")
         history = chat_memory.get("history", [])
         pdf_text = pdf_store.get("text", "")
 
-        # Smart reply if PDF not uploaded yet but user is referring to PDF
-        if not pdf_text and re.search(r"\b(pdf|upload|file|document)\b", question, re.IGNORECASE):
-            response = "📎 Mujhe abhi tak koi PDF receive nahi hua. Pehle upload karke batayein."
+        # Smart response if user refers to PDF but hasn't uploaded yet
+        if not pdf_text and re.search(r"\b(pdf|upload|file|document|send)\b", question, re.IGNORECASE):
+            if re.search(r"(send|bhej(na)?|upload)\b", question, re.IGNORECASE):
+                response = "👍 Theek hai, PDF bhejna chahtay ho toh mai intezaar kar raha hoon. Jab ready ho, upload kar dena."
+            else:
+                response = "📎 Mujhe abhi tak koi PDF receive nahi hua. Pehle upload karke batayein."
             history.append({"role": "user", "content": question})
             history.append({"role": "assistant", "content": response})
             chat_memory["history"] = history
             return JSONResponse({"response": response})
 
-        # If PDF is available, include snippet smartly
+        # Include PDF content if available
         if pdf_text:
             question += f"\n\n(PDF se jarurat ho to use yeh content):\n{pdf_text[:3000]}"
 
