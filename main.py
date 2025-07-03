@@ -57,8 +57,17 @@ async def ask_question(payload: dict):
     full_input = f"{pdf_text}\n\n{question}" if pdf_text else question
 
     # Prompt + model
+       # Prompt + model
     prompt = get_prompt()
-    chain = prompt | ChatGroq(model_name="llama3-70b-8192", temperature=0.3) | memory
+    llm = ChatGroq(model_name="llama3-70b-8192", temperature=0.3)
+    chain = prompt | llm
+
+    # Load past memory manually (fixed)
+    chat_history = memory.load_memory_variables({}).get("history", [])
+    response = chain.invoke({"input": full_input, "chat_history": chat_history})
+    memory.save_context({"input": full_input}, {"output": response.content})
+    return JSONResponse({"response": response.content})
+
 
     try:
         response = chain.invoke({"input": full_input})
