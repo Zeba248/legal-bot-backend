@@ -4,9 +4,10 @@ requests
 python-multipart
 pdfplumber
 PyMuPDF==1.24.1
+PyPDF2
 langchain
 chromadb
 tiktoken
 pypdfium2
 groq
-langchain-groq 
+langchain-groq
