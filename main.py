@@ -2,6 +2,7 @@ from fastapi import FastAPI, UploadFile, File, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from utils import extract_pdf_text, get_groq_response
+import re
 
 app = FastAPI()
 
@@ -47,17 +48,25 @@ async def upload_pdf(file: UploadFile = File(...)):
         }
     ]
 
-    return {"message": f"✅ I got your PDF: {file.filename}. Kya karna chahte ho?"}
+    return {"message": f"✅ I got your PDF: {file.filename}. Kya karna chahte ho?", "doc_id": file.filename}
 
 @app.post("/ask")
 async def ask_question(request: Request):
     try:
         data = await request.json()
-        question = data.get("question", "")
+        question = data.get("question", "").strip()
         history = chat_memory.get("history", [])
         pdf_text = pdf_store.get("text", "")
 
-        # Include PDF content if exists
+        # Smart reply if PDF not uploaded yet but user is referring to PDF
+        if not pdf_text and re.search(r"\b(pdf|upload|file|document)\b", question, re.IGNORECASE):
+            response = "📎 Mujhe abhi tak koi PDF receive nahi hua. Pehle upload karke batayein."
+            history.append({"role": "user", "content": question})
+            history.append({"role": "assistant", "content": response})
+            chat_memory["history"] = history
+            return JSONResponse({"response": response})
+
+        # If PDF is available, include snippet smartly
         if pdf_text:
             question += f"\n\n(PDF se jarurat ho to use yeh content):\n{pdf_text[:3000]}"
 
