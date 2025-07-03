@@ -9,4 +9,4 @@ chromadb
 tiktoken
 pypdfium2
 groq
-
+langchain-groq 
