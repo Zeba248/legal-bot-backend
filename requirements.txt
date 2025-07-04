@@ -13,3 +13,5 @@ tiktoken
 pypdfium2
 groq
 PyPDF2
+python-dotenv
+openai
