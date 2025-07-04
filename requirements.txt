@@ -5,9 +5,9 @@ python-multipart
 pdfplumber
 PyMuPDF==1.24.1
 langchain
+langchain-core==0.1.35
+langchain-community
+langchain-groq
 chromadb
 tiktoken
 pypdfium2
-groq
-PyPDF2
-langchain_groq
