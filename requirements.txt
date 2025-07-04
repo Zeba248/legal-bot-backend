@@ -11,3 +11,5 @@ langchain-groq
 chromadb
 tiktoken
 pypdfium2
+groq
+PyPDF2
