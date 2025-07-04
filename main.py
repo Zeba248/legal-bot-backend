@@ -21,14 +21,17 @@ app.add_middleware(
 chat_sessions = {}
 pdf_store = {}
 
-# ✅ Smart Prompt with language/tone handling
+# ✅ Smart Prompt with Hinglish/English handling & context awareness
 def get_prompt():
     return ChatPromptTemplate.from_messages([
         ("system", 
          "You're ATOZ Legal Assistant — a professional, helpful legal expert trained in Indian law. "
-         "Reply in the same tone (Hinglish or English) as the user. Don't say 'I'm a language model' or act robotic. "
+         "Reply in the same tone (Hinglish or English) as the user. Don't say 'I'm a language model'. "
          "If a PDF has been uploaded, consider its content (context is passed). "
-         "Avoid giving false statements, and always reply naturally and intelligently like a legal expert."),
+         "Avoid giving false info. Always behave like a human legal expert, not robotic. "
+         "NEVER ask about personal things like hobbies or feelings. "
+         "If user says casual things like 'hmm', 'ok', 'acha', respond casually but always redirect to legal topic. "
+         "Every answer must help them navigate Indian law smartly and smoothly."),
         ("human", "{input}")
     ])
 
@@ -46,7 +49,7 @@ async def ask_question(payload: dict):
 
     pdf_text = pdf_store.get(session_id)
 
-    # ✅ Fix: Smart detection when user talks about PDFs
+    # ✅ Smart PDF intent detection and soft reply
     if not pdf_text and re.search(r"\b(pdf|upload|file|document)\b", question, re.IGNORECASE):
         response = "Sure, please go ahead and upload the PDF. I'm ready!"
         memory.chat_memory.add_user_message(question)
@@ -57,20 +60,15 @@ async def ask_question(payload: dict):
     full_input = f"{pdf_text}\n\n{question}" if pdf_text else question
 
     # Prompt + model
-       # Prompt + model
     prompt = get_prompt()
     llm = ChatGroq(model_name="llama3-70b-8192", temperature=0.3)
     chain = prompt | llm
 
-    # Load past memory manually (fixed)
+    # Load full history & inject
     chat_history = memory.load_memory_variables({}).get("history", [])
-    response = chain.invoke({"input": full_input, "chat_history": chat_history})
-    memory.save_context({"input": full_input}, {"output": response.content})
-    return JSONResponse({"response": response.content})
-
-
     try:
-        response = chain.invoke({"input": full_input})
+        response = chain.invoke({"input": full_input, "chat_history": chat_history})
+        memory.save_context({"input": full_input}, {"output": response.content})
         return JSONResponse({"response": response.content})
     except Exception as e:
         return JSONResponse({"response": f"⚠️ Error: {str(e)}"})
