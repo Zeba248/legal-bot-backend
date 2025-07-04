@@ -18,14 +18,14 @@ def extract_pdf_text(contents: bytes) -> str:
     os.remove("temp.pdf")
     return text.strip()
 
-# ✅ Hinglish-friendly Groq Chat Function with retry
+# ✅ Hinglish/English Aware Response Generator
 def get_groq_response(history):
-    for attempt in range(2):  # 1 retry allowed
+    for attempt in range(2):
         try:
             chat = client.chat.completions.create(
-                model="llama3-70b-8192",  # Use your preferred model
+                model="llama3-70b-8192",
                 messages=history,
-                temperature=0.4
+                temperature=0.3,
             )
             return chat.choices[0].message.content.strip()
 
