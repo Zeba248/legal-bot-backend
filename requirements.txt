@@ -5,9 +5,10 @@ python-multipart
 pdfplumber
 PyMuPDF==1.24.1
 langchain
-langchain-core==0.1.35
+langchain-core
 langchain-community
 langchain-groq
+langchain-openai
 chromadb
 tiktoken
 pypdfium2
@@ -15,3 +16,11 @@ groq
 PyPDF2
 python-dotenv
 openai
+sentence-transformers
+faiss-cpu
+numpy
+pandas
+typing-extensions
+pydantic
+sqlalchemy
+psycopg2-binary
